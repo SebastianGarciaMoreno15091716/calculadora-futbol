@@ -647,7 +647,7 @@
   //  );
   // ════════════════════════════════════════════
 
-  const supabase = window.supabase
+  const sbClient = (window.supabase && window.supabase.createClient)
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
     : null;
 
@@ -662,12 +662,12 @@
   }
 
   async function guardarEnSupabase(datos) {
-    if (!supabase) { showToast('⚠️ Supabase no configurado', 'error'); return; }
+    if (!sbClient) { showToast('⚠️ Supabase no configurado', 'error'); return; }
     if (SUPABASE_URL.includes('TU_PROYECTO')) {
       showToast('⚠️ Configura tu URL de Supabase en el código', 'error'); return;
     }
     try {
-      const { error } = await supabase.from(TABLA).insert([datos]);
+      const { error } = await sbClient.from(TABLA).insert([datos]);
       if (error) throw error;
       showToast('✅ Guardado en la base de datos');
       cargarHistorial();
