@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard · Fatigue Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #f5f7fa;
+  --surface:  #ffffff;
+  --surface2: #f0f4f8;
+  --border:   #dde3ec;
+  --accent:   #0070f3;
+  --accent2:  #ff6b35;
+  --green:    #00c853;
+  --yellow:   #ffab00;
+  --red:      #f5222d;
+  --text:     #1a2236;
+  --muted:    #8a99b0;
+  --font-display: 'Barlow Condensed', sans-serif;
+  --font-body:    'Barlow', sans-serif;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 30px 20px;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0,112,243,0.05) 0%, transparent 60%),
+    repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(0,0,0,0.02) 40px),
+    repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(0,0,0,0.02) 40px);
+}
+
+.wrapper { max-width: 1100px; margin: 0 auto; }
+
+/* HEADER */
+header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 36px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.logo-icon {
+  width: 52px; height: 52px;
+  background: linear-gradient(135deg, var(--accent), #0080ff);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px;
+  flex-shrink: 0;
+  box-shadow: 0 0 24px rgba(0,112,243,0.3);
+}
+
+header h1 {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+header h1 span {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.2em;
+  color: var(--accent);
+  margin-top: 4px;
+}
+
+.header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  background: rgba(0,112,243,0.08);
+  border: 1px solid rgba(0,112,243,0.25);
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  border-radius: 20px;
+}
+
+.btn-refresh {
+  padding: 8px 18px;
+  background: linear-gradient(135deg, var(--accent), #0080ff);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+  box-shadow: 0 4px 16px rgba(0,112,243,0.25);
+}
+.btn-refresh:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,112,243,0.35); }
+
+/* CARD */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+}
+
+.card-title {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 20px;
+}
+
+/* KPI GRID */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.kpi {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 16px;
+  text-align: center;
+  transition: transform .2s;
+}
+.kpi:hover { transform: translateY(-2px); }
+
+.kpi .val {
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--accent);
+}
+.kpi .lbl {
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.kpi.rojo   .val { color: var(--red); }
+.kpi.amarillo .val { color: var(--yellow); }
+.kpi.verde  .val { color: var(--green); }
+
+/* FILTROS */
+.filtros {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.filtros input, .filtros select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  padding: 9px 14px;
+  outline: none;
+  transition: border-color .2s;
+}
+.filtros input:focus, .filtros select:focus { border-color: var(--accent); }
+.filtros input { width: 220px; }
+
+.filtro-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* TABLA */
+.table-wrap { overflow-x: auto; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+thead th {
+  text-align: left;
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 10px 12px;
+  border-bottom: 2px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+thead th:hover { color: var(--accent); }
+thead th .sort-icon { margin-left: 4px; opacity: 0.5; }
+thead th.sorted .sort-icon { opacity: 1; color: var(--accent); }
+
+tbody td {
+  padding: 12px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: var(--surface2); }
+
+.pill {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
+}
+.pill-verde    { background: #e6f9ee; color: #00703a; }
+.pill-amarillo { background: #fff8e1; color: #8a6200; }
+.pill-rojo     { background: #fff0f0; color: #b91c1c; }
+
+.fatiga-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fatiga-bar .mini-track {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+  min-width: 60px;
+}
+.fatiga-bar .mini-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width .8s ease;
+}
+
+/* CHARTS GRID */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.chart-wrap {
+  position: relative;
+  height: 240px;
+}
+
+/* PAGINATION */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.pagination .info {
+  font-size: 0.75rem;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+}
+.page-btns { display: flex; gap: 6px; }
+.page-btn {
+  width: 32px; height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface2);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.page-btn:hover { border-color: var(--accent); color: var(--accent); }
+.page-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* EMPTY / LOADING */
+.empty-state {
+  text-align: center;
+  color: var(--muted);
+  padding: 50px 20px;
+  font-size: 0.9rem;
+}
+.spinner {
+  display: inline-block;
+  width: 28px; height: 28px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  margin-bottom: 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* TOAST */
+.toast {
+  position: fixed;
+  bottom: 28px; left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: #1a2236;
+  color: #fff;
+  padding: 12px 22px;
+  border-radius: 30px;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  opacity: 0;
+  transition: all .35s cubic-bezier(.25,.46,.45,.94);
+  z-index: 999;
+  white-space: nowrap;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.error { background: #7f1d1d; }
+
+/* MODAL DETALLE */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(10,15,30,0.6);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity .25s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 32px;
+  width: 100%;
+  max-width: 480px;
+  position: relative;
+  transform: translateY(20px);
+  transition: transform .25s;
+}
+.modal-overlay.open .modal { transform: translateY(0); }
+.modal-close {
+  position: absolute; top: 16px; right: 16px;
+  width: 32px; height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface2);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem;
+  color: var(--muted);
+  transition: all .15s;
+}
+.modal-close:hover { border-color: var(--red); color: var(--red); }
+.modal-title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 20px;
+}
+.modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.modal-field {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.modal-field .mf-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.modal-field .mf-val {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* DELETE BUTTON */
+.btn-delete {
+  margin-top: 20px;
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  border: 1px solid var(--red);
+  border-radius: 8px;
+  color: var(--red);
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all .2s;
+}
+.btn-delete:hover { background: var(--red); color: #fff; }
+
+@media (max-width: 700px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .charts-grid { grid-template-columns: 1fr; }
+  .filtros input { width: 100%; }
+  header h1 { font-size: 1.4rem; }
+}
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <div class="logo-icon">⚽</div>
+    <h1>
+      Fatigue Monitor
+      <span>Dashboard · Historial de Registros</span>
+    </h1>
+    <div class="header-right">
+      <div class="badge" id="statusBadge">Conectando...</div>
+      <button class="btn-refresh" onclick="cargarTodo()">↺ Actualizar</button>
+    </div>
+  </header>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="val" id="kpiTotal">—</div>
+      <div class="lbl">Total Registros</div>
+    </div>
+    <div class="kpi verde">
+      <div class="val" id="kpiListos">—</div>
+      <div class="lbl">Listo para Jugar</div>
+    </div>
+    <div class="kpi amarillo">
+      <div class="val" id="kpiPrecaucion">—</div>
+      <div class="lbl">Precaución</div>
+    </div>
+    <div class="kpi rojo">
+      <div class="val" id="kpiRiesgo">—</div>
+      <div class="lbl">Alto Riesgo</div>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="charts-grid" style="margin-bottom:20px;">
+    <div class="card">
+      <p class="card-title">Distribución de Estados</p>
+      <div class="chart-wrap">
+        <canvas id="chartDonut"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <p class="card-title">Fatiga Promedio por Jugador</p>
+      <div class="chart-wrap">
+        <canvas id="chartBars"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLA -->
+  <div class="card">
+    <p class="card-title">Registros de Jugadores</p>
+
+    <div class="filtros">
+      <span class="filtro-label">Filtrar:</span>
+      <input type="text" id="filtroNombre" placeholder="🔍  Buscar jugador..." oninput="aplicarFiltros()">
+      <select id="filtroEstado" onchange="aplicarFiltros()">
+        <option value="">Todos los estados</option>
+        <option value="Listo para Jugar">✅ Listo para Jugar</option>
+        <option value="Precaución">⚠️ Precaución</option>
+        <option value="Alto Riesgo">🔴 Alto Riesgo</option>
+      </select>
+      <select id="filtroOrden" onchange="aplicarFiltros()">
+        <option value="desc">Más recientes primero</option>
+        <option value="asc">Más antiguos primero</option>
+      </select>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortBy('created_at')">Fecha <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('nombre')">Jugador <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('minutos')">Min <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('rpe')">RPE <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('carga')">Carga (UA) <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('fatiga')">Fatiga <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('psico')">Psico <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('estado')">Estado <span class="sort-icon">↕</span></th>
+            <th>Ver</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyRegistros">
+          <tr><td colspan="9"><div class="empty-state"><div class="spinner"></div><br>Cargando registros...</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination">
+      <div class="info" id="paginationInfo">—</div>
+      <div class="page-btns" id="pageButtons"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL DETALLE -->
+<div class="modal-overlay" id="modalOverlay" onclick="cerrarModal(event)">
+  <div class="modal">
+    <button class="modal-close" onclick="cerrarModal()">✕</button>
+    <div class="modal-title" id="modalNombre">—</div>
+    <div class="modal-grid" id="modalGrid"></div>
+    <button class="btn-delete" id="btnEliminar" onclick="eliminarRegistro()">🗑 Eliminar Registro</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://pnnzlykghudxfedjcmlv.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_7owiURgPYcokLd_TK37GaA_UdcvRlkO';
+const TABLA = 'jugadores';
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let todosLosRegistros = [];
+let registrosFiltrados = [];
+let paginaActual = 1;
+const POR_PAGINA = 15;
+let sortCol = 'created_at';
+let sortDir = 'desc';
+let registroSeleccionado = null;
+let chartDonut, chartBars;
+
+/* ── TOAST ── */
+function toast(msg, tipo = 'ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (tipo === 'error' ? ' error' : '');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+/* ── CARGA PRINCIPAL ── */
+async function cargarTodo() {
+  document.getElementById('statusBadge').textContent = 'Cargando...';
+  try {
+    const { data, error } = await sb
+      .from(TABLA)
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+
+    todosLosRegistros = data || [];
+    document.getElementById('statusBadge').textContent = `${todosLosRegistros.length} registros`;
+    document.getElementById('statusBadge').style.color = 'var(--green)';
+
+    calcularKPIs();
+    renderCharts();
+    aplicarFiltros();
+  } catch (e) {
+    document.getElementById('statusBadge').textContent = 'Error de conexión';
+    document.getElementById('statusBadge').style.color = 'var(--red)';
+    toast('❌ Error al cargar: ' + e.message, 'error');
+  }
+}
+
+/* ── KPIs ── */
+function calcularKPIs() {
+  const total      = todosLosRegistros.length;
+  const listos     = todosLosRegistros.filter(r => r.estado === 'Listo para Jugar').length;
+  const precaucion = todosLosRegistros.filter(r => r.estado === 'Precaución').length;
+  const riesgo     = todosLosRegistros.filter(r => r.estado === 'Alto Riesgo').length;
+  document.getElementById('kpiTotal').textContent     = total;
+  document.getElementById('kpiListos').textContent    = listos;
+  document.getElementById('kpiPrecaucion').textContent= precaucion;
+  document.getElementById('kpiRiesgo').textContent    = riesgo;
+}
+
+/* ── CHARTS ── */
+function renderCharts() {
+  Chart.defaults.color = '#8a99b0';
+  Chart.defaults.font.family = "'Barlow Condensed', sans-serif";
+
+  // DONUT
+  const listos     = todosLosRegistros.filter(r => r.estado === 'Listo para Jugar').length;
+  const precaucion = todosLosRegistros.filter(r => r.estado === 'Precaución').length;
+  const riesgo     = todosLosRegistros.filter(r => r.estado === 'Alto Riesgo').length;
+
+  const ctxD = document.getElementById('chartDonut').getContext('2d');
+  if (chartDonut) chartDonut.destroy();
+  chartDonut = new Chart(ctxD, {
+    type: 'doughnut',
+    data: {
+      labels: ['Listo', 'Precaución', 'Alto Riesgo'],
+      datasets: [{
+        data: [listos, precaucion, riesgo],
+        backgroundColor: ['rgba(0,200,83,0.75)', 'rgba(255,171,0,0.75)', 'rgba(245,34,45,0.75)'],
+        borderColor: ['#00c853', '#ffab00', '#f5222d'],
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { padding: 16, font: { size: 12, weight: '600' } } },
+        tooltip: { backgroundColor: '#1a2236', borderColor: '#dde3ec', borderWidth: 1 }
+      },
+      cutout: '65%'
+    }
+  });
+
+  // BARRAS por jugador (promedio fatiga)
+  const byPlayer = {};
+  todosLosRegistros.forEach(r => {
+    if (!byPlayer[r.nombre]) byPlayer[r.nombre] = [];
+    byPlayer[r.nombre].push(parseFloat(r.fatiga) || 0);
+  });
+  const players = Object.keys(byPlayer).slice(0, 8);
+  const avgFatiga = players.map(p => {
+    const arr = byPlayer[p];
+    return (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1);
+  });
+
+  const ctxB = document.getElementById('chartBars').getContext('2d');
+  if (chartBars) chartBars.destroy();
+  chartBars = new Chart(ctxB, {
+    type: 'bar',
+    data: {
+      labels: players,
+      datasets: [{
+        label: 'Fatiga Prom.',
+        data: avgFatiga,
+        backgroundColor: avgFatiga.map(v =>
+          v > 7 ? 'rgba(245,34,45,0.6)' :
+          v >= 4 ? 'rgba(255,171,0,0.6)' :
+                   'rgba(0,200,83,0.6)'),
+        borderColor: avgFatiga.map(v =>
+          v > 7 ? '#f5222d' : v >= 4 ? '#ffab00' : '#00c853'),
+        borderWidth: 1.5, borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: '#1a2236', borderColor: '#dde3ec', borderWidth: 1 }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10, weight: '600' } } },
+        y: { beginAtZero: true, max: 10, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { stepSize: 2 } }
+      }
+    }
+  });
+}
+
+/* ── FILTROS Y ORDEN ── */
+function aplicarFiltros() {
+  const busqueda = document.getElementById('filtroNombre').value.toLowerCase();
+  const estado   = document.getElementById('filtroEstado').value;
+
+  registrosFiltrados = todosLosRegistros.filter(r => {
+    const matchNombre = !busqueda || (r.nombre || '').toLowerCase().includes(busqueda);
+    const matchEstado = !estado   || r.estado === estado;
+    return matchNombre && matchEstado;
+  });
+
+  // Ordenar
+  registrosFiltrados.sort((a, b) => {
+    let va = a[sortCol], vb = b[sortCol];
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    if (va < vb) return sortDir === 'asc' ? -1 : 1;
+    if (va > vb) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  paginaActual = 1;
+  renderTabla();
+}
+
+function sortBy(col) {
+  if (sortCol === col) {
+    sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortCol = col;
+    sortDir = 'desc';
+  }
+  document.querySelectorAll('thead th').forEach(th => th.classList.remove('sorted'));
+  event.currentTarget.classList.add('sorted');
+  aplicarFiltros();
+}
+
+/* ── RENDER TABLA ── */
+function renderTabla() {
+  const tbody = document.getElementById('tbodyRegistros');
+  const total = registrosFiltrados.length;
+
+  if (total === 0) {
+    tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state">No se encontraron registros.</div></td></tr>';
+    document.getElementById('paginationInfo').textContent = '0 registros';
+    document.getElementById('pageButtons').innerHTML = '';
+    return;
+  }
+
+  const inicio = (paginaActual - 1) * POR_PAGINA;
+  const fin    = Math.min(inicio + POR_PAGINA, total);
+  const pagina = registrosFiltrados.slice(inicio, fin);
+
+  const pillClass = {
+    'Alto Riesgo':     'pill-rojo',
+    'Precaución':      'pill-amarillo',
+    'Listo para Jugar':'pill-verde'
+  };
+
+  tbody.innerHTML = pagina.map(r => {
+    const fecha = new Date(r.created_at).toLocaleDateString('es-CO', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+    const fatNum = parseFloat(r.fatiga) || 0;
+    const fatPct = (fatNum / 10 * 100).toFixed(0);
+    const fatColor = fatNum > 7 ? '#f5222d' : fatNum >= 4 ? '#ffab00' : '#00c853';
+    const pill = pillClass[r.estado] || 'pill-amarillo';
+    const initial = (r.nombre || '?').charAt(0).toUpperCase();
+
+    return `<tr>
+      <td style="color:var(--muted);font-size:0.78rem;">${fecha}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#ff6b35,#0070f3);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:900;font-size:0.9rem;color:#000;flex-shrink:0;">${initial}</div>
+          <strong>${r.nombre || '—'}</strong>
+        </div>
+      </td>
+      <td>${r.minutos ?? '—'}</td>
+      <td>${r.rpe ?? '—'}</td>
+      <td><strong>${r.carga ?? '—'}</strong> <span style="color:var(--muted);font-size:0.75rem;">UA</span></td>
+      <td>
+        <div class="fatiga-bar">
+          <span style="font-family:var(--font-display);font-weight:700;min-width:28px;">${fatNum}</span>
+          <div class="mini-track">
+            <div class="mini-fill" style="width:${fatPct}%;background:${fatColor};"></div>
+          </div>
+        </div>
+      </td>
+      <td style="font-family:var(--font-display);font-weight:700;">${r.psico ?? '—'}</td>
+      <td><span class="pill ${pill}">${r.estado || '—'}</span></td>
+      <td>
+        <button onclick='abrirModal(${JSON.stringify(r).replace(/'/g,"&#39;")})' 
+          style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;cursor:pointer;font-family:var(--font-display);font-size:0.75rem;color:var(--accent);font-weight:700;transition:all .15s;"
+          onmouseover="this.style.background='var(--accent)';this.style.color='#fff';"
+          onmouseout="this.style.background='var(--surface2)';this.style.color='var(--accent)';">
+          Ver
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Pagination
+  const totalPag = Math.ceil(total / POR_PAGINA);
+  document.getElementById('paginationInfo').textContent =
+    `Mostrando ${inicio + 1}–${fin} de ${total} registros`;
+
+  let btns = '';
+  btns += `<button class="page-btn" onclick="irAPagina(${paginaActual-1})" ${paginaActual===1?'disabled':''}>‹</button>`;
+  for (let i = 1; i <= totalPag; i++) {
+    if (totalPag <= 7 || i === 1 || i === totalPag || Math.abs(i - paginaActual) <= 1) {
+      btns += `<button class="page-btn ${i===paginaActual?'active':''}" onclick="irAPagina(${i})">${i}</button>`;
+    } else if (Math.abs(i - paginaActual) === 2) {
+      btns += `<button class="page-btn" disabled>…</button>`;
+    }
+  }
+  btns += `<button class="page-btn" onclick="irAPagina(${paginaActual+1})" ${paginaActual===totalPag?'disabled':''}>›</button>`;
+  document.getElementById('pageButtons').innerHTML = btns;
+}
+
+function irAPagina(n) {
+  const total = Math.ceil(registrosFiltrados.length / POR_PAGINA);
+  if (n < 1 || n > total) return;
+  paginaActual = n;
+  renderTabla();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ── MODAL ── */
+function abrirModal(registro) {
+  registroSeleccionado = registro;
+  document.getElementById('modalNombre').textContent = (registro.nombre || 'Jugador').toUpperCase();
+  document.getElementById('btnEliminar').dataset.id = registro.id;
+
+  const campos = [
+    { label: 'Fecha', val: new Date(registro.created_at).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) },
+    { label: 'Minutos', val: registro.minutos ?? '—' },
+    { label: 'RPE', val: registro.rpe ?? '—' },
+    { label: 'Carga (UA)', val: registro.carga ?? '—' },
+    { label: 'Dolor Musc.', val: registro.dolor ?? '—' },
+    { label: 'Estrés Físico', val: registro.estres ?? '—' },
+    { label: 'Ansiedad', val: registro.ansiedad ?? '—' },
+    { label: 'Confianza', val: registro.confianza ?? '—' },
+    { label: 'Índice Fatiga', val: registro.fatiga ?? '—' },
+    { label: 'Estado Psico', val: registro.psico ?? '—' },
+  ];
+
+  const pillClass = { 'Alto Riesgo': 'pill-rojo', 'Precaución': 'pill-amarillo', 'Listo para Jugar': 'pill-verde' };
+  const pill = pillClass[registro.estado] || 'pill-amarillo';
+
+  document.getElementById('modalGrid').innerHTML = campos.map(c => `
+    <div class="modal-field">
+      <div class="mf-label">${c.label}</div>
+      <div class="mf-val">${c.val}</div>
+    </div>
+  `).join('') + `
+    <div class="modal-field" style="grid-column:1/-1;">
+      <div class="mf-label">Estado</div>
+      <div style="margin-top:4px;"><span class="pill ${pill}" style="font-size:0.85rem;padding:4px 14px;">${registro.estado || '—'}</span></div>
+    </div>`;
+
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function cerrarModal(e) {
+  if (e && e.target !== document.getElementById('modalOverlay') && !e.currentTarget.classList.contains('modal-close')) return;
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+async function eliminarRegistro() {
+  const id = registroSeleccionado?.id;
+  if (!id) return;
+  if (!confirm(`¿Eliminar el registro de "${registroSeleccionado.nombre}"?`)) return;
+  try {
+    const { error } = await sb.from(TABLA).delete().eq('id', id);
+    if (error) throw error;
+    document.getElementById('modalOverlay').classList.remove('open');
+    toast('🗑 Registro eliminado');
+    cargarTodo();
+  } catch (e) {
+    toast('❌ Error al eliminar: ' + e.message, 'error');
+  }
+}
+
+// Cerrar modal con ESC
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('modalOverlay').classList.remove('open');
+});
+
+// Iniciar
+window.addEventListener('DOMContentLoaded', cargarTodo);
+</script>
+</body>
+</html>
